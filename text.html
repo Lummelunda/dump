@@ -44,19 +44,12 @@
     font-size: 14px;
     cursor: pointer;
   }
-
-  #share-link {
-    margin-left: 8px;
-    display: none;
-    text-decoration: underline;
-    color: blue;
-  }
 </style>
+
 <article contenteditable="plaintext-only" spellcheck></article>
 
 <div id="share-container">
   <button id="share-btn">Share</button>
-  <a id="share-link" href="#" target="_blank"></a>
 </div>
 
 <script>
@@ -134,24 +127,10 @@
 
   // ---------- SHARE BUTTON ----------
   const shareBtn = document.getElementById('share-btn')
-  const shareLink = document.getElementById('share-link')
-
-  shareBtn.addEventListener('click', async () => {
+  shareBtn.addEventListener('click', () => {
     const longUrl = location.href
     const api = 'https://is.gd/create.php?format=simple&url=' + encodeURIComponent(longUrl)
-    try {
-      const res = await fetch(api)
-      const shortUrl = await res.text()
-      shareLink.href = shortUrl
-      shareLink.textContent = shortUrl
-      shareLink.style.display = 'inline'
-
-      // Copy to clipboard
-      await navigator.clipboard.writeText(shortUrl)
-      shareBtn.textContent = 'Copied!'
-      setTimeout(() => shareBtn.textContent = 'Share', 1500)
-    } catch (e) {
-      alert('Failed to generate short link.')
-    }
+    // Open the short link generator in a new tab
+    window.open(api, '_blank')
   })
 </script>
