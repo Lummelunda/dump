@@ -1,0 +1,38 @@
+<!doctype html>
+<html><body>
+<textarea id="text"></textarea><br>
+<input id="title"><br><br>
+<button id="b">Publish</button>
+<div id="out"></div>
+<script>
+let tk;
+document.getElementById('b').onclick = async function() {
+  this.disabled = true;
+  if(!tk){
+    const res = await fetch('https://api.telegra.ph/createAccount?short_name=Anon')
+      .then(r=>r.json());
+    tk = res.result.access_token;
+  }
+  const c = document.getElementById('text').value
+    .split('\n')
+    .filter(l=>l.trim())
+    .map(l => /^https?:\/\//.test(l) ? 
+      {tag:'p', children:[{tag:'a', attrs:{href:l}, children:['Link']}] } :
+      {tag:'p', children:[l.trim()]});
+  const body = new URLSearchParams({
+    access_token: tk,
+    title: document.getElementById('title').value || '\u200B',
+    content: JSON.stringify(c)
+  });
+  const r = await fetch('https://api.telegra.ph/createPage',{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body
+  }).then(r=>r.json());
+  document.getElementById('out').innerHTML = r.ok ? 
+    `<a href="${r.result.url}" target="_blank">${r.result.url}</a>` :
+    `Error: ${r.error}`;
+  this.disabled = false;
+};
+</script>
+</body></html>
