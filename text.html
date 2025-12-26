@@ -1,3 +1,5 @@
+<!-- A small riff on this https://github.com/antonmedv/textarea -->
+
 <!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,6 +22,10 @@
     }
   }
 
+  body {
+    position: relative;
+  }
+
   article {
     outline: none;
     padding: 18px max(18px, calc(50vw - 400px));
@@ -34,23 +40,19 @@
     overflow-wrap: break-word;
   }
 
-  #share-container {
-    margin-top: 12px;
+  #share-link {
+    position: fixed;
+    top: 12px;
+    left: 12px;
     font-size: 14px;
-  }
-
-  #share-btn {
-    padding: 4px 8px;
-    font-size: 14px;
-    cursor: pointer;
+    text-decoration: underline;
+    color: blue;
+    z-index: 1000;
   }
 </style>
 
+<a id="share-link" href="#" target="_blank">Share</a>
 <article contenteditable="plaintext-only" spellcheck></article>
-
-<div id="share-container">
-  <button id="share-btn">Share</button>
-</div>
 
 <script>
   const article = document.querySelector('article')
@@ -125,12 +127,12 @@
     }
   }
 
-  // ---------- SHARE BUTTON ----------
-  const shareBtn = document.getElementById('share-btn')
-  shareBtn.addEventListener('click', () => {
+  // ---------- SHARE LINK ----------
+  const shareLink = document.getElementById('share-link')
+  shareLink.addEventListener('click', (e) => {
+    e.preventDefault()
     const longUrl = location.href
     const api = 'https://is.gd/create.php?format=simple&url=' + encodeURIComponent(longUrl)
-    // Open the short link generator in a new tab
     window.open(api, '_blank')
   })
 </script>
