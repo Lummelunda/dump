@@ -1,6 +1,6 @@
 Publish to Telegraph
 
-[https://lummelunda.github.io/dump/tele.html](https://lummelunda.github.io/dump/tele.html)
+[Publish to Telegraph](https://lummelunda.github.io/dump/tele.html)
 
-[https://lummelunda.github.io/dump/text.html](https://lummelunda.github.io/dump/text.html)
+[URL hash text editor with share](https://lummelunda.github.io/dump/text.html)
 
