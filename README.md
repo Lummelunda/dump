@@ -4,4 +4,4 @@
 [URL hash text editor with share](https://lummelunda.github.io/dump/text.html)
 
 
-<small>[Repo](https://github.com/Lummelunda/dump/)</small>
+<small>[(Go to repo)](https://github.com/Lummelunda/dump/)</small>
