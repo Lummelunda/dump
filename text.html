@@ -60,10 +60,15 @@
     z-index: 1000;
     opacity: 0.9;
     word-break: break-all;
+    cursor: pointer;
   }
 
   #short-link.stale {
     opacity: 0.5;
+  }
+
+  #short-link.copied {
+    opacity: 0.3;
   }
 </style>
 
@@ -227,6 +232,22 @@
     } catch (err) {
       shareLink.textContent = 'Share'
       console.error(err)
+    }
+  })
+
+  // ---------- COPY SHORT LINK ----------
+  shortLink.addEventListener('click', async (e) => {
+    // Copy on plain click, allow normal open with modifier keys
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+
+    e.preventDefault()
+
+    try {
+      await navigator.clipboard.writeText(shortLink.href)
+      shortLink.classList.add('copied')
+      setTimeout(() => shortLink.classList.remove('copied'), 300)
+    } catch (err) {
+      console.error('Clipboard failed', err)
     }
   })
 </script>
