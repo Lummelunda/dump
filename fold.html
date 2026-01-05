@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Plain log (composer + indent folding)</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+
+    <!-- Folding -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/indent-fold.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+
+    <!-- In-editor Find -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/dialog/dialog.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/searchcursor.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/search/search.min.js"></script>
+
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #191e25;
+        color: #a2acbb;
+      }
+
+      :root {
+        --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        --bg: #191e25;
+        --text: #a2acbb;
+        --muted: rgba(162, 172, 187, 0.7);
+        --muted2: rgba(162, 172, 187, 0.38);
+        --focusBg: rgba(0, 0, 0, 0.18);
+        --stroke: rgba(162, 172, 187, 0.15);
+      }
+
+      .app {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .composerRow {
+        padding: 10px 18px 0 18px;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .composerRow textarea {
+        flex: 1;
+        width: 100%;
+        box-sizing: border-box;
+
+        min-height: 42px;
+        resize: none;
+        overflow: hidden;
+
+        font: 14px/1.4 var(--mono);
+        padding: 10px 12px;
+
+        border: 0;
+        outline: none;
+
+        background: transparent;
+        border-radius: 10px;
+
+        margin: 0;
+        display: block;
+
+        color: var(--muted);
+      }
+
+      .composerRow textarea:focus {
+        background: var(--focusBg);
+      }
+
+      .composerRow textarea::placeholder {
+        color: var(--muted2);
+      }
+
+      .btn {
+        font: 13px/1 var(--mono);
+        padding: 10px 10px;
+        border: 0;
+        background: transparent;
+        color: rgba(162, 172, 187, 0.75);
+        cursor: pointer;
+        border-radius: 8px;
+        user-select: none;
+      }
+      .btn:hover {
+        background: rgba(162, 172, 187, 0.08);
+        color: rgba(162, 172, 187, 0.95);
+      }
+
+      .editor {
+        flex: 1;
+        min-height: 0;
+      }
+
+      .CodeMirror {
+        height: 100%;
+        font: 14px/1.4 var(--mono);
+        padding: 8px 15px;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .CodeMirror-cursor {
+        border-left: 1.5px solid rgba(162, 172, 187, 0.35);
+      }
+
+      .CodeMirror-selected { background: rgba(162, 172, 187, 0.16) !important; }
+      .CodeMirror-focused .CodeMirror-selected { background: rgba(162, 172, 187, 0.22) !important; }
+
+      /* Hide inline fold markers (use gutter only) */
+      .CodeMirror-foldmarker { display: none !important; }
+
+      /* Gutter feels like margin */
+      .CodeMirror-gutters { background: transparent; border-right: none; }
+      .CodeMirror-foldgutter { width: 12px; }
+      .CodeMirror-foldgutter-open, .CodeMirror-foldgutter-folded { opacity: 0.35; }
+      .CodeMirror-foldgutter-open:hover, .CodeMirror-foldgutter-folded:hover { opacity: 0.8; }
+
+      /* In-editor find */
+      .CodeMirror-dialog {
+        background: var(--bg);
+        color: var(--text);
+        border-bottom: 1px solid var(--stroke);
+        font: 14px/1.4 var(--mono);
+      }
+      .CodeMirror-dialog input {
+        background: transparent;
+        color: var(--text);
+        border: 0;
+        outline: none;
+        font: 14px/1.4 var(--mono);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="app">
+      <div class="composerRow">
+        <textarea
+          id="composer"
+          placeholder="Write here…"
+          spellcheck="false"
+          autocapitalize="off"
+          autocomplete="off"
+          autocorrect="off"
+        ></textarea>
+        <button class="btn" id="helpBtn" title="Help">?</button>
+      </div>
+
+      <div class="editor">
+        <textarea id="t"></textarea>
+      </div>
+    </div>
+
+    <script>
+      const STORAGE_KEY = "plain_log_v1";
+      const SAVE_DEBOUNCE_MS = 600;
+
+      const HELP_TEXT = [
+        "Help",
+        "",
+        "Capture",
+        "  Cmd+K         Focus composer",
+        "  Cmd+Enter     Prepend composer to top",
+        "",
+        "Folding (indent-based)",
+        "  Tab           Indent (creates foldable blocks)",
+        "  Shift+Tab     Outdent",
+        "  Cmd+Enter     Toggle fold at cursor (in editor)",
+        "",
+        "Find",
+        "  Cmd+F         Find (in-editor)",
+        "  Cmd+G         Next",
+        "  Shift+Cmd+G   Previous",
+        "",
+        "Backup",
+        "  Cmd+S         Export journal.txt",
+        "",
+        "Links",
+        "  Cmd+Click     Open URL under cursor",
+        "",
+        "Notes",
+        "  Folding follows indentation. A parent line can fold the indented lines beneath it.",
+        "  Press Escape to exit this help view.",
+        ""
+      ].join("\n");
+
+      let helpMode = false;
+
+      // ---- Editor ----
+      const cm = CodeMirror.fromTextArea(document.getElementById("t"), {
+        lineNumbers: false,
+        mode: null,
+        lineWrapping: true,
+
+        indentWithTabs: true,
+        indentUnit: 1,
+        tabSize: 1,
+
+        gutters: ["CodeMirror-foldgutter"],
+        foldGutter: true,
+        foldOptions: {
+          rangeFinder: CodeMirror.fold.indent,
+          clearOnEnter: false
+        },
+
+        extraKeys: {
+          Tab: (cm) => cm.execCommand("insertTab"),
+          "Shift-Tab": (cm) => cm.execCommand("indentLess"),
+
+          "Cmd-F": "findPersistent",
+          "Ctrl-F": "findPersistent",
+          "Cmd-G": "findNext",
+          "Shift-Cmd-G": "findPrev",
+
+          // Toggle fold at cursor
+          "Cmd-Enter": (cm) => cm.foldCode(cm.getCursor()),
+        },
+      });
+
+      // Disable spellcheck on CodeMirror's hidden input (best-effort)
+      try {
+        const inp = cm.getInputField();
+        inp.setAttribute("spellcheck", "false");
+        inp.setAttribute("autocapitalize", "off");
+        inp.setAttribute("autocomplete", "off");
+        inp.setAttribute("autocorrect", "off");
+      } catch (e) {}
+
+      // Load initial content (start empty if none)
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        cm.setValue(saved || "");
+      } catch (e) {
+        cm.setValue("");
+      }
+
+      // Fold everything on load (after CM has rendered)
+      setTimeout(() => {
+        if (!helpMode) cm.execCommand("foldAll");
+      }, 0);
+
+      // ---- Autosave (debounced) ----
+      let saveTimer = null;
+
+      function scheduleSave() {
+        if (helpMode) return;
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try { localStorage.setItem(STORAGE_KEY, cm.getValue()); } catch (e) {}
+        }, SAVE_DEBOUNCE_MS);
+      }
+
+      cm.on("change", scheduleSave);
+
+      window.addEventListener("beforeunload", () => {
+        if (helpMode) return;
+        try { localStorage.setItem(STORAGE_KEY, cm.getValue()); } catch (e) {}
+      });
+
+      // ---- Cmd+Click link open (supports https://, www., and bare domains) ----
+      // Conservative: requires at least one dot and a TLD-ish ending (2+ letters).
+      const LINK_RE = /\b(?:(https?:\/\/)?(?:www\.)?)((?:[a-z0-9-]+\.)+[a-z]{2,})(?::\d{2,5})?(?:\/[^\s<>()\[\]{}"']*)?/ig;
+
+      function stripTrailingPunct(s) {
+        // common “I pasted a link,” punctuation
+        return s.replace(/[),.;:!?]+$/, "");
+      }
+
+      cm.getWrapperElement().addEventListener("mousedown", (e) => {
+        if (!e.metaKey) return;
+
+        const pos = cm.coordsChar({ left: e.clientX, top: e.clientY });
+        const line = cm.getLine(pos.line);
+        if (!line) return;
+
+        LINK_RE.lastIndex = 0;
+        let m;
+        while ((m = LINK_RE.exec(line))) {
+          const start = m.index;
+          const end = start + m[0].length;
+
+          if (pos.ch >= start && pos.ch <= end) {
+            let url = stripTrailingPunct(m[0]);
+
+            // Normalise: if no protocol, assume https://
+            if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+
+            window.open(url, "_blank", "noopener,noreferrer");
+            e.preventDefault();
+            return;
+          }
+        }
+      });
+
+      // ---- Composer ----
+      const composer = document.getElementById("composer");
+
+      function autoGrow(el) {
+        el.style.height = "0px";
+        const max = 220;
+        el.style.height = Math.min(el.scrollHeight, max) + "px";
+      }
+      autoGrow(composer);
+      composer.addEventListener("input", () => autoGrow(composer));
+
+      function prependFromComposer() {
+        const text = composer.value;
+        if (!text.trim()) return;
+
+        const doc = cm.getDoc();
+        const scroll = cm.getScrollInfo();
+        const cursor = doc.getCursor();
+
+        const clean = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\s+$/, "");
+        doc.replaceRange(clean + "\n", { line: 0, ch: 0 });
+
+        const addedLines = clean.split("\n").length;
+        doc.setCursor({ line: cursor.line + addedLines, ch: cursor.ch });
+        cm.scrollTo(scroll.left, scroll.top + cm.defaultTextHeight() * addedLines);
+
+        cm.refresh();
+
+        composer.value = "";
+        autoGrow(composer);
+        composer.focus();
+      }
+
+      composer.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && e.metaKey) {
+          e.preventDefault();
+          prependFromComposer();
+        }
+      });
+
+      // ---- Export ----
+      function getJournalTextForExport() {
+        if (!helpMode) return cm.getValue();
+        try { return localStorage.getItem(STORAGE_KEY) || ""; } catch (e) { return ""; }
+      }
+
+      function exportTxt() {
+        const text = getJournalTextForExport();
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "journal.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      // ---- Help toggle (replaces editor content temporarily) ----
+      const helpBtn = document.getElementById("helpBtn");
+      let journalCache = "";
+
+      function toggleHelp(force) {
+        const next = typeof force === "boolean" ? force : !helpMode;
+        if (next === helpMode) return;
+
+        if (next) {
+          journalCache = cm.getValue();
+          helpMode = true;
+          cm.setValue(HELP_TEXT);
+          cm.setCursor({ line: 0, ch: 0 });
+          cm.focus();
+        } else {
+          helpMode = false;
+          cm.setValue(journalCache);
+          cm.focus();
+          setTimeout(() => cm.execCommand("foldAll"), 0);
+        }
+      }
+
+      helpBtn.addEventListener("click", () => toggleHelp());
+
+      // ---- Global shortcuts ----
+      document.addEventListener("keydown", (e) => {
+        // Cmd+K focuses composer
+        if (e.metaKey && !e.shiftKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "k") {
+          e.preventDefault();
+          composer.focus();
+          composer.select();
+          return;
+        }
+
+        // Cmd+S exports (even when help is showing)
+        if (e.metaKey && !e.shiftKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === "s") {
+          e.preventDefault();
+          exportTxt();
+          return;
+        }
+
+        // Escape exits help
+        if (e.key === "Escape" && helpMode) {
+          toggleHelp(false);
+          return;
+        }
+      });
+
+      // Keep Cmd+F inside CodeMirror when focused
+      cm.getWrapperElement().addEventListener("keydown", (e) => {
+        if (e.metaKey && e.key.toLowerCase() === "f") e.preventDefault();
+      });
+    </script>
+  </body>
+</html>
