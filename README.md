@@ -5,4 +5,4 @@
 
 [Text fold notes](https://lummelunda.github.io/dump/fold.html)
 
-<small>[Repo](https://github.com/Lummelunda/dump/)</small>
+<small>[(Repo)](https://github.com/Lummelunda/dump/)</small>
