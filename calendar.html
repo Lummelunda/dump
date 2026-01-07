@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Minimalistisk Väggplanerare (70x50cm)</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      background: #f4f4f4;
+      color: #333;
+    }
+    header {
+      padding: 12px 24px;
+      background: #ffffff;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .control-group { display: flex; align-items: center; gap: 8px; }
+    header label { font-weight: 700; color: #333; font-size: 13px; }
+    header input, header select {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      background: white;
+    }
+    header button {
+      padding: 8px 14px;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #444;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    header #downloadBtn { background: white; color: #444; }
+    header .hint { font-size: 11px; color: #777; margin-left: auto; }
+
+    main { padding: 20px; display: flex; justify-content: center; }
+    .preview-wrap {
+      background: white;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 10px;
+      max-width: 100%;
+      overflow: auto;
+    }
+    #svgHost svg { width: 1100px; height: auto; display: block; background: white; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="control-group">
+      <label for="year">År</label>
+      <input id="year" type="number" min="1900" max="2100" />
+    </div>
+    <div class="control-group">
+      <label for="layoutMode">Layout</label>
+      <select id="layoutMode">
+        <option value="months-rows">Månader som rader</option>
+        <option value="months-cols" selected>Månader som kolumner</option>
+      </select>
+    </div>
+    <button id="renderBtn" type="button">Uppdatera</button>
+    <button id="downloadBtn" type="button">Ladda ner SVG</button>
+    <span class="hint">Posterformat: 700mm × 500mm</span>
+  </header>
+
+  <main>
+    <div class="preview-wrap">
+      <div id="svgHost"></div>
+    </div>
+  </main>
+
+  <script>
+    const CONFIG = {
+      width: 700, 
+      height: 500,
+      margin: 6,            
+      labelSpace: 12,       
+      headerHeight: 8,      
+      gridColor: "#b8b8b8", 
+      gridWidth: 0.18,     
+      textMain: "#1a1a1a",
+      dayFontSize: 2.2,     
+      weekendFill: "#f4f4f4", 
+      invalidFill: "#ffffff",
+      fontFamily: "Arial, sans-serif"
+    };
+
+    const MONTHS = ["JAN","FEB","MAR","APR","MAJ","JUN","JUL","AUG","SEP","OKT","NOV","DEC"];
+
+    function getDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+    function getDayOfWeek(y, m, d) { return new Date(y, m, d).getDay(); }
+    function createSvgElement(tag) { return document.createElementNS("http://www.w3.org/2000/svg", tag); }
+
+    function generatePlanner() {
+      const year = parseInt(document.getElementById("year").value);
+      const mode = document.getElementById("layoutMode").value;
+      const { width, height, margin, labelSpace, headerHeight, gridColor, gridWidth, weekendFill, invalidFill } = CONFIG;
+      
+      const svg = createSvgElement("svg");
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      svg.setAttribute("width", `${width}mm`);
+      svg.setAttribute("height", `${height}mm`);
+      svg.style.fontFamily = CONFIG.fontFamily;
+
+      const bg = createSvgElement("rect");
+      bg.setAttribute("width", width);
+      bg.setAttribute("height", height);
+      bg.setAttribute("fill", "#ffffff");
+      svg.appendChild(bg);
+
+      // Centrerat och diskret År
+      const title = createSvgElement("text");
+      title.setAttribute("x", width / 2);
+      title.setAttribute("y", margin + 4);
+      title.setAttribute("font-size", "6");
+      title.setAttribute("font-weight", "900");
+      title.setAttribute("text-anchor", "middle");
+      title.setAttribute("fill", "#666");
+      title.textContent = year;
+      svg.appendChild(title);
+
+      const isMonthsRows = (mode === 'months-rows');
+      const actualLeftSpace = isMonthsRows ? labelSpace : 2; 
+      const gX = margin + actualLeftSpace;
+      const gY = margin + headerHeight + (!isMonthsRows ? 4 : 0);
+      const gW = width - (margin * 2) - actualLeftSpace;
+      const gH = height - (margin * 2) - headerHeight - (!isMonthsRows ? 4 : 0);
+      
+      const rows = isMonthsRows ? 12 : 31;
+      const cols = isMonthsRows ? 31 : 12;
+      const cellW = gW / cols;
+      const cellH = gH / rows;
+
+      for (let r = 0; r < rows; r++) {
+        if (isMonthsRows) {
+            const mLabel = createSvgElement("text");
+            mLabel.setAttribute("x", margin);
+            mLabel.setAttribute("y", gY + (r * cellH) + (cellH / 1.6));
+            mLabel.setAttribute("font-size", "3.2");
+            mLabel.setAttribute("font-weight", "bold");
+            mLabel.setAttribute("fill", CONFIG.textMain);
+            mLabel.textContent = MONTHS[r];
+            svg.appendChild(mLabel);
+        }
+
+        for (let c = 0; c < cols; c++) {
+          const mIndex = isMonthsRows ? r : c;
+          const dNum = isMonthsRows ? c + 1 : r + 1;
+          const x = gX + (c * cellW);
+          const y = gY + (r * cellH);
+
+          if (!isMonthsRows && r === 0) {
+            const colLabel = createSvgElement("text");
+            colLabel.setAttribute("x", x + (cellW / 2));
+            colLabel.setAttribute("y", gY - 2.2);
+            colLabel.setAttribute("font-size", "3");
+            colLabel.setAttribute("font-weight", "bold");
+            colLabel.setAttribute("text-anchor", "middle");
+            colLabel.setAttribute("fill", CONFIG.textMain);
+            colLabel.textContent = MONTHS[c];
+            svg.appendChild(colLabel);
+          }
+
+          const daysInM = getDaysInMonth(year, mIndex);
+          const exists = dNum <= daysInM;
+          const dow = exists ? getDayOfWeek(year, mIndex, dNum) : 0;
+          const isWeekend = exists && (dow === 0 || dow === 6);
+
+          const rect = createSvgElement("rect");
+          rect.setAttribute("x", x);
+          rect.setAttribute("y", y);
+          rect.setAttribute("width", cellW);
+          rect.setAttribute("height", cellH);
+          rect.setAttribute("fill", !exists ? invalidFill : (isWeekend ? weekendFill : "none"));
+          rect.setAttribute("stroke", gridColor);
+          rect.setAttribute("stroke-width", gridWidth);
+          svg.appendChild(rect);
+
+          if (exists) {
+            // Dagsiffra (Bara siffran, inget annat)
+            const dText = createSvgElement("text");
+            dText.setAttribute("x", x + 0.6);
+            dText.setAttribute("y", y + CONFIG.dayFontSize + 0.4);
+            dText.setAttribute("font-size", CONFIG.dayFontSize);
+            dText.setAttribute("font-weight", "bold");
+            dText.setAttribute("fill", "#666");
+            dText.textContent = dNum;
+            svg.appendChild(dText);
+          }
+        }
+      }
+
+      const border = createSvgElement("rect");
+      border.setAttribute("x", gX);
+      border.setAttribute("y", gY);
+      border.setAttribute("width", gW);
+      border.setAttribute("height", gH);
+      border.setAttribute("fill", "none");
+      border.setAttribute("stroke", gridColor);
+      border.setAttribute("stroke-width", gridWidth * 3);
+      svg.appendChild(border);
+
+      return svg;
+    }
+
+    function render() {
+      const host = document.getElementById("svgHost");
+      host.innerHTML = "";
+      host.appendChild(generatePlanner());
+    }
+
+    function download() {
+      const year = document.getElementById("year").value;
+      const svgEl = generatePlanner();
+      const serializer = new XMLSerializer();
+      let source = serializer.serializeToString(svgEl);
+      source = '<?xml version="1.0" standalone="no"?>\r\n' + source;
+      const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(source);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Planerare_${year}_UltraMinimal.svg`;
+      link.click();
+    }
+
+    document.getElementById("year").value = 2026;
+    document.getElementById("renderBtn").addEventListener("click", render);
+    document.getElementById("downloadBtn").addEventListener("click", download);
+    render();
+  </script>
+</body>
+</html>
